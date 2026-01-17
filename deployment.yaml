@@ -1,4 +1,4 @@
-apiVersion: apps/v1
+piVersion: apps/v1
 kind: Deployment
 metadata:
   name: playground
@@ -17,3 +17,4 @@ spec:
           image: wil42/playground:v1
           ports:
             - containerPort: 8888
+
