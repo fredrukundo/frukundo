@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_LOGIN/YOUR_REPO.git
+    repoURL: https://github.com/fredrukundo/frukundo
     targetRevision: HEAD
     path: .
   destination:
