@@ -1,73 +1,78 @@
 #!/bin/bash
-set -e # Stop script on any error
+# Exit on error
+set -e 
 
-# 1. Clean up existing environment
 echo "Cleaning up..."
+# Ignore errors if cluster doesn't exist
 sudo k3d cluster delete mon-cluster || true
 
-# 2. Update and Install Prerequisites
+echo "Installing prerequisites..."
 sudo apt-get update
-sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+# Removed software-properties-common, added curl and ca-certificates
+sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
 
-# 3. Install Docker
+# Install Docker if not present
 if ! command -v docker &> /dev/null; then
+    echo "Installing Docker..."
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
     sudo usermod -aG docker $USER
 fi
 
-# 4. Install K3d
+# Install K3d if not present
 if ! command -v k3d &> /dev/null; then
+    echo "Installing K3d..."
     curl -s https://raw.githubusercontent.com/rancher/k3d/main/install.sh | bash
 fi
 
-# 5. Install Kubectl
+# Install Kubectl if not present
 if ! command -v kubectl &> /dev/null; then
+    echo "Installing Kubectl..."
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
     chmod +x kubectl
     sudo mv kubectl /usr/local/bin/
 fi
 
-# 6. Create K3d Cluster
-# Mapping 8888 to 80 for the application as shown in project examples [cite: 515]
-sudo k3d cluster create mon-cluster --port "8888:80@loadbalancer" --port "4242:443@loadbalancer"
+echo "Creating K3d Cluster..."
+# Mandatory: map port 8888 for the app [cite: 175, 478]
+# Mandatory: map port 8080 or 4242 for ArgoCD UI [cite: 501, 515]
+sudo k3d cluster create mon-cluster --port "8888:80@loadbalancer" --port "8080:443@loadbalancer" --wait
 
-# 7. Setup Kubeconfig for current user (Fixes connection refused issues)
+# FIX: Ensure kubectl can talk to the cluster without sudo errors
 mkdir -p $HOME/.kube
 sudo k3d kubeconfig get mon-cluster > $HOME/.kube/config
 sudo chown $USER:$USER $HOME/.kube/config
+export KUBECONFIG=$HOME/.kube/config
 
-# 8. Setup Namespaces [cite: 460, 461, 462]
-kubectl create namespace argocd
-kubectl create namespace dev
+echo "Setting up Namespaces..."
+# Mandatory namespaces: argocd and dev [cite: 460, 461, 462]
+kubectl create namespace argocd || true
+kubectl create namespace dev || true
 
-# 9. Install Argo CD [cite: 444]
+echo "Installing Argo CD..."
+# Use the stable manifest as required [cite: 501]
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
-echo "Waiting for Argo CD to become ready..."
+echo "Waiting for Argo CD pods..."
 kubectl wait --for=condition=available deployments -n argocd --all --timeout=300s
 
-# 10. Extract Initial Admin Password [cite: 501]
+# Save ArgoCD password [cite: 501]
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d > ../argo_password
-echo "ArgoCD password saved to p3/argo_password"
+echo "Password saved in p3/argo_password"
 
-# 11. Apply Argo CD Application (The GitOps Link) [cite: 451, 463]
-# IMPORTANT: Ensure your files are in p3/confs/ as per subject 
+echo "Applying Application Manifest..."
+# This links your GitHub repo to the cluster [cite: 463, 465]
 kubectl apply -f ../confs/app.yaml -n argocd
 
-echo "Waiting for Argo CD to sync and deploy the application to 'dev'..."
-# We wait for the deployment to appear in the 'dev' namespace
+echo "Waiting for GitOps Sync (this may take a minute)..."
 until kubectl get deployment playground -n dev >/dev/null 2>&1; do
-  echo "Syncing..."
-  sleep 10
+  sleep 5
 done
 
 kubectl wait --for=condition=available deployments/playground -n dev --timeout=300s
 
-# 12. Port Forwarding for Access
-# ArgoCD UI on 4242, App on 8888 [cite: 478, 515]
-kubectl port-forward svc/argocd-server -n argocd 4242:443 --address 0.0.0.0 >/dev/null 2>&1 &
+# Background Port-Forwarding
+# Service must be accessible at localhost:8888 [cite: 478, 515]
 kubectl port-forward svc/playground-service -n dev 8888:8888 --address 0.0.0.0 >/dev/null 2>&1 &
 
-echo "Setup Complete!"
-echo "App available at: http://localhost:8888"
+echo "Deployment complete! Verify with: curl http://localhost:8888/"
