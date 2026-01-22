@@ -3,24 +3,23 @@
 This README explains **step by step** how to run the **bonus part** of the project.  
 The goal is to replace **GitHub** with a **local GitLab**, while keeping the **same GitOps workflow** using **Argo CD**.
 
-The bonus assumes **Part 3 is already working**.
+⚠️ The bonus assumes **Part 3 is already working**.
 
 ---
 
 ## 0. Bonus directory structure
 
-bonus/
-├── scripts/
-│ ├── install-gitlab.sh
-│ └── cleanup.sh
-|
-└── confs/
-|
-├── values.yaml
-├── namespace-dev.yaml
-├── deployment.yaml
-├── service.yaml
-└── argocd-application.yaml
+bonus/  
+├── scripts/  
+│   ├── install-gitlab.sh  
+│   └── cleanup.sh  
+└── confs/  
+    ├── values.yaml  
+    ├── namespace-dev.yaml  
+    ├── deployment.yaml  
+    ├── service.yaml  
+    └── argocd-application.yaml  
+
 
 ## 1. Install Helm & GitLab inside the cluster
 
