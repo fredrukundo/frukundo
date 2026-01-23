@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# This script cleans up the k3d cluster, GitLab installation, and related resources
 set -e
 
 CLUSTER_NAME="iot"
