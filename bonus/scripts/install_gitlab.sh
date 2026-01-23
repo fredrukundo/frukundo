@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# This script installs GitLab on the host machine
 echo "start - install gitlab - "$HOST_IP
 
 echo "[1]: install gitlab"
