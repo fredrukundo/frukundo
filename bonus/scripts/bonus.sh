@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# This script configures the k3d cluster and deploys a GitLab project and application to ArgoCD
 HOST_IP=$(hostname -I | cut -d " " -f1)
 
 k3d cluster edit k3s-default --port-add 8889:30889@loadbalancer
