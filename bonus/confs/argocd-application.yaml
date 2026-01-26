@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: bonus-gitlab-app
+  namespace: argocd
+spec:
+  project: gitlab-project
+  source:
+    repoURL: http://gitlab.gitlab.svc.cluster.local/root/bonus-app.git
+    targetRevision: main
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gitlab
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: false
