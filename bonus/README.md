@@ -77,7 +77,7 @@ Open:
 - Password: (from your Argo CD install script / secret)
 
 ## 3) Install GitLab (Helm + optimized values)
-You already have:__ bonus/scripts/install-gitlab.sh__ and __bonus/confs/values.yaml__.
+You already have: __bonus/scripts/install-gitlab.sh__ and __bonus/confs/values.yaml__.
 
 Run:
 
@@ -146,7 +146,7 @@ Create folder:
 mkdir -p manifests
 ```
 
-Create <manifests/namespace.yaml>:
+Create __manifests/namespace.yaml__:
 
 ```bash
 apiVersion: v1
@@ -155,7 +155,7 @@ metadata:
   name: bonus
 ```
 
-Create <manifests/deployment.yaml> (IMPORTANT: <wil42/playground> listens on **8888** ):
+Create __manifests/deployment.yaml__ (IMPORTANT: __wil42/playground__ listens on **8888** ):
 
 ```bash
 apiVersion: apps/v1
@@ -180,7 +180,7 @@ spec:
             - containerPort: 8888
 ```
 
-Create <manifests/service.yaml>:
+Create __manifests/service.yaml__:
 
 ```bash
 apiVersion: v1
@@ -220,7 +220,7 @@ Create token:
 
 ### 5.2 Create Argo CD repository secret
 
-Create: <bonus/confs/argocd-repo-secret.yaml>
+Create: __bonus/confs/argocd-repo-secret.yaml__
 
 Replace <READ_TOKEN>:
 ```bash
@@ -246,7 +246,7 @@ kubectl apply -f bonus/confs/argocd-repo-secret.yaml
 
 ### 5.3 Create Argo CD application
 
-Create: <bonus/confs/argocd-application.yaml>
+Create: __bonus/confs/argocd-application.yaml__
 
 ```bash
 apiVersion: argoproj.io/v1alpha1
@@ -300,11 +300,11 @@ Test:
 curl http://localhost:8090
 ```
 
-✅ Expected: response from <wil42/playground> (v1).
+✅ Expected: response from __wil42/playground__ (v1).
 
 ## 7) GitOps proof (EXAM): update to v2 with Git push only
 
-Edit <manifests/deployment.yaml>:
+Edit __manifests/deployment.yaml__:
 
 ```bash
 - image: wil42/playground:v1
