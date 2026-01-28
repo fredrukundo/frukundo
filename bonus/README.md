@@ -1,144 +1,354 @@
-# Inception of Things – Bonus (Local GitLab with Argo CD)
+# BONUS — GitLab + Argo CD on AWS EKS (Inception of Things)
 
-This README explains **step by step** how to run the **bonus part** of the project.  
-The goal is to replace **GitHub** with a **local GitLab**, while keeping the **same GitOps workflow** using **Argo CD**.
+This bonus demonstrates a complete **GitOps workflow** on **AWS EKS**:
 
-⚠️ The bonus assumes **Part 3 is already working**.
+- **GitLab** hosts the Kubernetes manifests (single source of truth)
+- **Argo CD** continuously syncs the cluster from GitLab
+- A **git push** updates the cluster automatically (v1 → v2)
+
+> All commands below are intended to be executed **inside your Debian VM**.
 
 ---
 
-## 0. Bonus directory structure
+## 0) Prerequisites
 
-bonus/  
-├── scripts/  
-│   ├── install-gitlab.sh  
-│   └── cleanup.sh  
-└── confs/  
-    ├── values.yaml  
-    ├── namespace-dev.yaml  
-    ├── deployment.yaml  
-    ├── service.yaml  
-    └── argocd-application.yaml  
+You need these tools available in the VM:
 
+- `aws` (AWS CLI v2) configured
+- `eksctl`
+- `kubectl`
+- `helm`
+- `git`
 
-## 1. Install Helm & GitLab inside the cluster
+Quick checks:
 
-- Helm is required to install GitLab.
-
-Install GitLab in a **dedicated namespace** using Helm:
-
-```sh
-bash bonus/scripts/install-gitlab.sh
-
+```bash
+aws sts get-caller-identity
+eksctl version
+kubectl version --client
 helm version
+git --version
 ```
 
-This step can take **several minutes**.
+## 1) Create the EKS cluster (eksctl)
 
-Wait until all GitLab pods are running:
+Example (single 16GB node, recommended for GitLab):
+```bash
+eksctl create cluster \
+  --name iot-bonus \
+  --region us-east-1 \
+  --nodegroup-name standard-workers \
+  --node-type t3.xlarge \
+  --nodes 1 \
+  --nodes-min 1 \
+  --nodes-max 1 \
+  --managed
+```
+Verify:
+```bash
+kubectl get nodes
+```
 
-```sh
+✅ Expected: 1 node in __Ready__ state.
+
+## 2) Install Argo CD
+Use your existing Argo CD installer script (already prepared in your repo).
+
+
+After installing, verify:
+
+```bash
+kubectl get pods -n argocd
+```
+✅ Expected: all Argo CD pods __Running__.
+
+Access Argo CD UI:
+
+```bash
+kubectl -n argocd port-forward svc/argocd-server 8080:443
+```
+
+Open:
+
+- URL: __https://localhost:8080__
+
+- User: __admin__
+
+- Password: (from your Argo CD install script / secret)
+
+## 3) Install GitLab (Helm + optimized values)
+You already have:__ bonus/scripts/install-gitlab.sh__ and __bonus/confs/values.yaml__.
+
+Run:
+
+```bash
+bash bonus/scripts/install-gitlab.sh
+```
+
+Verify:
+
+```bash
 kubectl get pods -n gitlab
 ```
 
-## 2. Access GitLab
+✅ Expected: all GitLab pods __Running__ (no __Pending__).
 
-Forward the GitLab web service:
+Access GitLab UI:
 
-```sh
-kubectl -n gitlab port-forward svc/gitlab-webservice-default 8081:8181
+```bash
+kubectl -n gitlab port-forward svc/gitlab-webservice-default 8082:8181
 ```
 
-Open in your browser:
-```sh
-http://localhost:8081
+Open:
+
+- URL: __http://localhost:8082__
+
+- User: __root__
+
+- Password: printed by __install-gitlab.sh__ (or read from secret)
+
+## 4) Create a GitLab repo and push manifests (HTTP)
+### 4.1 Create repo
+
+In GitLab UI:
+
+- Create a Public project named: iot-bonus
+
+Recommended (reduce noise/resources):
+
+- Project → Settings → CI/CD → Auto DevOps OFF
+
+### 4.2 Create a push token (HTTP push)
+
+GitLab UI:
+
+- User → Edit profile → Access Tokens
+
+Create token:
+
+1. Name: push-iot-bonus
+
+2. Scopes: ✅ write_repository (or ✅ api)
+3. Copy it.
+
+### 4.3 Clone repo in your VM and add manifests
+
+Clone (replace <PUSH_TOKEN>):
+
+```bash
+git clone http://root:<PUSH_TOKEN>@localhost:8082/root/iot-bonus.git
+cd iot-bonus
 ```
 
-Login with:
+Create folder:
 
-- Username: **root**
-- Password: (printed at the end of **install-gitlab.sh**)
+```bash
+mkdir -p manifests
+```
 
-## 3. Create a GitLab repository
+Create <manifests/namespace.yaml>:
 
-Inside GitLab UI:
+```bash
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bonus
+```
 
-1. Create a **new project**
-2. Set visibility to **Public**
-3. Name it (example): **iot-bonus**
+Create <manifests/deployment.yaml> (IMPORTANT: <wil42/playground> listens on **8888** ):
 
-Clone the repository and push the configuration files:
-```sh
-bonus/confs/*
+```bash
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bonus-app
+  namespace: bonus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bonus
+  template:
+    metadata:
+      labels:
+        app: bonus
+    spec:
+      containers:
+        - name: app
+          image: wil42/playground:v1
+          ports:
+            - containerPort: 8888
+```
 
+Create <manifests/service.yaml>:
+
+```bash
+apiVersion: v1
+kind: Service
+metadata:
+  name: bonus-svc
+  namespace: bonus
+spec:
+  type: ClusterIP
+  selector:
+    app: bonus
+  ports:
+    - port: 80
+      targetPort: 8888
+```
+
+Commit + push:
+```bash
 git add .
-git commit -m "bonus: initial gitops config"
-git push
+git commit -m "Add manifests v1"
+git push -u origin main
 ```
 
-## 4. Create the dev namespace
-```sh
-kubectl apply -f bonus/confs/namespace-dev.yaml
+## 5) Wire Argo CD → GitLab (repo secret + application)
+### 5.1 Create a read-only token for Argo CD
+
+GitLab UI:
+
+- User → Edit profile → Access Tokens
+
+Create token:
+
+- Name: argocd-read
+
+- Scopes: ✅ read_repository
+- Copy it.
+
+### 5.2 Create Argo CD repository secret
+
+Create: <bonus/confs/argocd-repo-secret.yaml>
+
+Replace <READ_TOKEN>:
+```bash
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitlab-repo-iot-bonus
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  url: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-bonus.git
+  username: root
+  password: <READ_TOKEN>
+  type: git
 ```
 
-## 5. Deploy application via Argo CD (GitLab source)
+Apply:
 
-Apply the Argo CD Application manifest:
+```bash
+kubectl apply -f bonus/confs/argocd-repo-secret.yaml
+```
 
-```sh
+### 5.3 Create Argo CD application
+
+Create: <bonus/confs/argocd-application.yaml>
+
+```bash
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iot-bonus
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-bonus.git
+    targetRevision: main
+    path: manifests
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: bonus
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true
+```
+
+Apply:
+
+```bash
 kubectl apply -f bonus/confs/argocd-application.yaml
 ```
 
-Argo CD will now:
+Verify in Argo CD UI:
 
-- Pull manifests from **local GitLab**
-- Deploy the application into the **dev** namespace
+- Application <iot-bonus> → Synced / Healthy
 
-Check:
+## 6) Verify v1 running in the cluster
 
-```sh
-kubectl get applications -n argocd
+Check resources:
+
+```bash
+kubectl get ns bonus
+kubectl get pods -n bonus
+kubectl get svc -n bonus
 ```
 
-## 6. Verify application (v1)
+Port-forward the app:
 
-```sh
-curl http://localhost:8888
+```bash
+kubectl -n bonus port-forward svc/bonus-svc 8090:80
 ```
 
-Expected output:
-
-```sh
-{"status":"ok","message":"v1"}
+Test:
+```bash
+curl http://localhost:8090
 ```
 
-## 7. Update application to v2 (GitLab → Argo CD)
+✅ Expected: response from <wil42/playground> (v1).
 
-Edit _bonus/confs/deployment.yaml_ **inside GitLab**:
+## 7) GitOps proof (EXAM): update to v2 with Git push only
 
-```sh
-image: wil42/playground:v2
+Edit <manifests/deployment.yaml>:
+
+```bash
+- image: wil42/playground:v1
++ image: wil42/playground:v2
 ```
 
-Commit and push the change.
-
-Wait a few seconds for Argo CD to sync.
-
-Verify:
-```sh
-curl http://localhost:8888
+Commit + push:
+```bash
+git add manifests/deployment.yaml
+git commit -m "Update to v2"
+git push
 ```
 
-Expected output:
-```sh
-{"status":"ok","message":"v2"}
+Wait a few seconds (Argo CD auto-sync).
+
+Verify image is v2:
+```bash
+kubectl get pods -n bonus -o jsonpath='{.items[0].spec.containers[0].image}{"\n"}'
 ```
 
-## 8. Cleanup (optional)
+✅ Expected: wil42/playground:v2
 
-To reset the bonus environment:
-```sh
-bash bonus/scripts/cleanup.sh
+Verify service still responds:
+```bash
+curl http://localhost:8090
 ```
 
-This removes GitLab and all related resources.
+✅ Expected: successful response (v2).
+
+## 8) Cleanup (recommended to avoid AWS costs)
+### 8.1 Remove Argo CD application + repo secret
+```bash
+kubectl delete application iot-bonus -n argocd --ignore-not-found
+kubectl delete secret gitlab-repo-iot-bonus -n argocd --ignore-not-found
+```
+
+### 8.2 Remove GitLab
+```bash
+helm uninstall gitlab -n gitlab || true
+kubectl delete namespace gitlab --ignore-not-found
+```
+
+### 8.3 Delete the EKS cluster
+
+```bash
+eksctl delete cluster --name iot-bonus --region us-east-1
+```
