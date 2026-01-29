@@ -1,0 +1,101 @@
+global:
+  edition: ce
+
+  hosts:
+    domain: gitlab.local
+    https: false
+
+  ingress:
+    enabled: false
+    configureCertmanager: false
+
+  minio:
+    enabled: false
+
+  appConfig:
+    artifacts:
+      enabled: false
+    lfs:
+      enabled: false
+    uploads:
+      enabled: false
+    packages:
+      enabled: false
+    backups:
+      enabled: false
+
+gitlab-runner:
+  install: false
+
+nginx-ingress:
+  enabled: false
+
+prometheus:
+  install: false
+
+grafana:
+  enabled: false
+
+registry:
+  enabled: false
+
+gitlab:
+  toolbox:
+    enabled: false
+
+  webservice:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1Gi"
+      limits:
+        cpu: "1"
+        memory: "2Gi"
+
+  sidekiq:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+
+  gitaly:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "300m"
+        memory: "256Mi"
+
+postgresql:
+  install: true
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "500m"
+        memory: "1Gi"
+
+redis:
+  install: true
+  master:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "256Mi"
+      limits:
+        cpu: "300m"
+        memory: "512Mi"
