@@ -1,18 +1,18 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: bonus-gitlab-app
+  name: iot-bonus
   namespace: argocd
 spec:
-  project: gitlab-project
+  project: default
   source:
-    repoURL: http://gitlab.gitlab.svc.cluster.local/root/bonus-app.git
+    repoURL: http://gitlab-webservice-default.gitlab.svc.cluster.local:8181/root/iot-bonus.git
     targetRevision: main
     path: manifests
   destination:
     server: https://kubernetes.default.svc
-    namespace: gitlab
+    namespace: bonus
   syncPolicy:
     automated:
       selfHeal: true
-      prune: false
+      prune: true
