@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bonus-app
+  namespace: bonus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bonus
+  template:
+    metadata:
+      labels:
+        app: bonus
+    spec:
+      containers:
+        - name: app
+          image: wil42/playground:v2
+          ports:
+            - containerPort: 8888
