@@ -26,4 +26,6 @@ echo "=== Installing k3d ==="
 curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
 
 echo "=== Installation complete ==="
-echo "⚠️ Reboot OR run: newgrp docker"
+echo "⚠️ Reboot OR run: newgrp docker | then create a cluster"
+echo
+echo "== k3d cluster create iot --port <8888:30080@loadbalancer> "

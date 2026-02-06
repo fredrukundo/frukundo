@@ -10,11 +10,11 @@ kubectl apply -n argocd \
 
 echo "=== Waiting for Argo CD pods ==="
 kubectl wait --for=condition=Ready pods \
-  --all -n argocd --timeout=300s
+  --all -n argocd --timeout=600s
 
 echo "=== Argo CD is ready ==="
 echo "== port forward argocd =="
-echo "== kubectl -n argocd port-forwad svc/argocd-server 8080:443=="
+echo "== kubectl -n argocd port-forward svc/argocd-server 8080:443=="
 echo
 echo "=== Admin password / push to public repo if not yet ==="
 kubectl -n argocd get secret argocd-initial-admin-secret \
